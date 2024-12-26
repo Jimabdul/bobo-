@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BOBO</title>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameOver" class="hidden">
+      <h1>Game Over!</h1>
+      <p>Your Score: <span id="scoreDisplay"></span></p>
+      <button onclick="restartGame()">Play Again</button>
+    </div>
+    <button id="jumpButton" onclick="jump()">Jump</button>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+
+
+<style>
+/* General body and page settings */
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: url('./back.jpg') center center/cover no-repeat;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+}
+
+/* Game container */
+#game-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Canvas setup */
+canvas {
+  display: block;
+  background: url('./back.jpg') repeat-y center/cover;
+  width: 100%;
+  height: 100%;
+  max-width: 100vw;
+  max-height: 100vh;
+}
+
+/* Game Over screen */
+#gameOver {
+  text-align: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  padding: 40px 30px;
+  border-radius: 10px;
+}
+
+.hidden {
+  display: none;
+}
+
+button {
+  padding: 12px 24px;
+  font-size: 18px;
+  cursor: pointer;
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+}
+
+#jumpButton {
+  bottom: 100px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  #jumpButton {
+    bottom: 20px;
+    font-size: 16px;
+    padding: 8px 16px;
+  }
+
+  #gameOver {
+    padding: 30px;
+  }
+}
+
+</style>
+
+<script>
+
+  const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const gameOverDiv = document.getElementById('gameOver');
+const scoreDisplay = document.getElementById('scoreDisplay');
+const jumpButton = document.getElementById('jumpButton');
+
+// Game constants and variables
+const gravity = 0.3;
+let birdWidth = 100;
+let birdHeight = 100;
+const pipeWidth = 40;
+const pipeGap = 150;
+const coinRadius = 50;
+let birdX = 50;
+let birdY;
+let birdVelocity = 0;
+let pipeX;
+let pipeHeight;
+let score = 0;
+let gameOver = false;
+let coins = [];
+
+// Image elements
+const birdImage = new Image();
+const coinImage = new Image();
+
+// Load the images
+birdImage.src = './bobo rocket.png';
+coinImage.src = './bobo coin.png';
+
+// Adjust canvas size to fill the screen
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Set initial bird position
+birdY = canvas.height / 2;
+pipeX = canvas.width;
+
+// Resize canvas when window size changes
+window.addEventListener('resize', () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  birdY = canvas.height / 2;  // Re-center bird on resize
+});
+
+// Event listener for bird movement (jump on clicking the jump button)
+function jump() {
+  if (!gameOver) {
+    birdVelocity = -6;  // Make the bird jump upwards
+  }
+}
+
+// Function to generate new coins
+function generateCoins() {
+  if (Math.random() < 0.005) {
+    const coinX = canvas.width + 50;
+    const coinY = Math.random() * (canvas.height - coinRadius * 2) + coinRadius;
+    coins.push({ x: coinX, y: coinY });
+  }
+}
+
+// Function to check if the bird eats a coin
+function checkCoinCollision() {
+  for (let i = 0; i < coins.length; i++) {
+    const coin = coins[i];
+    if (birdX + birdWidth > coin.x && birdX < coin.x + coinRadius * 2 &&
+        birdY + birdHeight > coin.y && birdY < coin.y + coinRadius * 2) {
+      coins.splice(i, 1);  // Remove coin after collision
+      score++;  // Increase score
+      break; // Exit the loop after the first coin collision
+    }
+  }
+}
+
+// Game loop function
+function gameLoop() {
+  if (gameOver) return;
+
+  // Clear canvas for the new frame
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Update bird physics
+  birdVelocity += gravity;
+  birdY += birdVelocity;
+
+  // Draw the bird using the image
+  ctx.drawImage(birdImage, birdX, birdY, birdWidth, birdHeight);
+
+  // Draw pipes
+  pipeX -= 2;
+  if (pipeX + pipeWidth <= 0) {
+    pipeX = canvas.width;
+    pipeHeight = Math.floor(Math.random() * (canvas.height - pipeGap) * 0.5);
+    score++;
+  }
+
+  ctx.fillStyle = 'green';
+  ctx.fillRect(pipeX, 0, pipeWidth, pipeHeight); // Top pipe
+  ctx.fillRect(pipeX, pipeHeight + pipeGap, pipeWidth, canvas.height - pipeHeight - pipeGap); // Bottom pipe
+
+  // Generate and draw coins
+  generateCoins();
+  coins.forEach(coin => {
+    coin.x -= 2;
+    ctx.drawImage(coinImage, coin.x - coinRadius, coin.y - coinRadius, coinRadius * 2, coinRadius * 2); // Draw coin
+  });
+
+  // Check if the bird eats any coins
+  checkCoinCollision();
+
+  // Collision detection with pipes
+  if (birdY + birdHeight > canvas.height || birdY < 0) {
+    endGame();
+  }
+
+  if (birdX + birdWidth > pipeX && birdX < pipeX + pipeWidth) {
+    if (birdY < pipeHeight || birdY + birdHeight > pipeHeight + pipeGap) {
+      endGame();
+    }
+  }
+
+  // Display the score
+  ctx.fillStyle = 'black';
+  ctx.font = '20px Arial';
+  ctx.fillText('Score: ' + score, 10, 30);
+
+  // Continue the game loop
+  requestAnimationFrame(gameLoop);
+}
+
+// Restart the game
+function restartGame() {
+  gameOver = false;
+  birdY = canvas.height / 2;
+  birdVelocity = 0;
+  pipeX = canvas.width;
+  pipeHeight = Math.floor(Math.random() * (canvas.height - pipeGap) * 0.5);
+  score = 0;
+  coins = [];  // Reset coins
+  gameOverDiv.classList.add('hidden');
+  gameLoop();  // Restart the game loop
+}
+
+// Show Game Over screen
+function endGame() {
+  gameOver = true;
+  scoreDisplay.textContent = score;
+  gameOverDiv.classList.remove('hidden');
+}
+
+// Start the game
+gameLoop();
+
+</script>
